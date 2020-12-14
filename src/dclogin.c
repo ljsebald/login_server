@@ -1284,7 +1284,7 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
         sylverant_db_result_free(result);
 
         c->guildcard = gc;
-        send_dc_security(c, gc, NULL, 0);
+        send_dc_security(c, gc, pkt->sec_data, 64);
         send_motd(c);
         c->motd_wait = 1;
         return 0;
