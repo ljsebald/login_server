@@ -1117,7 +1117,7 @@ static int handle_xbhlcheck(login_client_t *c, xb_hlcheck_pkt *pkt) {
     }
 
     /* Escape all the important strings. */
-    sylverant_db_escape_str(&conn, xbluid, pkt->xbl_userid, 16);
+    sylverant_db_escape_str(&conn, xbluid, (const char *)pkt->xbl_userid, 16);
 
     sprintf(query, "SELECT guildcard FROM xbox_clients WHERE "
             "xbl_userid='%s'", xbluid);
@@ -1187,6 +1187,8 @@ static int handle_xbhlcheck(login_client_t *c, xb_hlcheck_pkt *pkt) {
             c->priv = strtoul(row[0], NULL, 0);
             return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_OK);
         }
+
+        return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_CONN_ERROR);
     }
     else {
         /* They aren't registered yet, so... Let's solve that. */
@@ -1197,15 +1199,13 @@ static int handle_xbhlcheck(login_client_t *c, xb_hlcheck_pkt *pkt) {
 }
 
 static int handle_xbloginc(login_client_t *c, xb_login_9c_pkt *pkt) {
-    uint32_t account, gc;
+    uint32_t gc;
     char query[256], xbluid[32], xblgt[32];
     void *result;
     char **row;
-    unsigned char hash[16];
-    int i;
 
     /* Escape all the important strings. */
-    sylverant_db_escape_str(&conn, xbluid, pkt->xbl_userid, 16);
+    sylverant_db_escape_str(&conn, xbluid, (const char *)pkt->xbl_userid, 16);
 
     sprintf(query, "SELECT guildcard FROM xbox_clients WHERE "
             "xbl_userid='%s'", xbluid);
@@ -1224,7 +1224,8 @@ static int handle_xbloginc(login_client_t *c, xb_login_9c_pkt *pkt) {
     }
     else {
         sylverant_db_result_free(result);
-        sylverant_db_escape_str(&conn, xblgt, pkt->xbl_gamertag, 16);
+        sylverant_db_escape_str(&conn, xblgt, (const char *)pkt->xbl_gamertag,
+                                16);
 
         /* Assign a nice fresh new guildcard number to the client. */
         sprintf(query, "INSERT INTO guildcards (account_id) VALUES (NULL)");
@@ -1254,7 +1255,7 @@ static int handle_xbloginc(login_client_t *c, xb_login_9c_pkt *pkt) {
 }
 
 static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
-    uint32_t gc, v;
+    uint32_t gc;
     char query[256], xbluid[32];
     void *result;
     char **row;
@@ -1264,7 +1265,7 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
     c->ext_version |= (pkt->version << 8);
 
     /* Escape all the important strings. */
-    sylverant_db_escape_str(&conn, xbluid, pkt->xbl_userid, 16);
+    sylverant_db_escape_str(&conn, xbluid, (const char *)pkt->xbl_userid, 16);
 
     sprintf(query, "SELECT guildcard FROM xbox_clients WHERE "
             "xbl_userid='%s'", xbluid);
@@ -1313,7 +1314,7 @@ static int handle_logind(login_client_t *c, dcv2_login_9d_pkt *pkt) {
 
 /* Handle a client's ship select packet. */
 static int handle_ship_select(login_client_t *c, dc_select_pkt *pkt) {
-    sylverant_quest_list_t *l;
+    sylverant_quest_list_t *l = NULL;
     uint32_t menu_id = LE32(pkt->menu_id);
     uint32_t item_id = LE32(pkt->item_id);
     int rv;
