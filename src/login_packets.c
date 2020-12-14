@@ -111,6 +111,11 @@ static int crypt_send(login_client_t *c, int len) {
         sendbuf[len++] = 0;
     }
 
+    if(c->type == CLIENT_TYPE_XBOX) {
+        printf("Sending packet to xbox:\n");
+        print_packet(sendbuf, len);
+    }
+
     /* Encrypt the packet */
     CRYPT_CryptData(&c->server_cipher, sendbuf, len, 1);
 

@@ -1654,6 +1654,11 @@ int process_dclogin_packet(login_client_t *c, void *pkt) {
         len = LE16(pc->pkt_len);
     }
 
+    if(c->type == CLIENT_TYPE_XBOX) {
+        printf("Received packet from xbox:\n");
+        print_packet(pkt, len);
+    }
+
     switch(type) {
         case LOGIN_88_TYPE:
             /* XXXX: Oh look, we have a network trial edition up in here. */
