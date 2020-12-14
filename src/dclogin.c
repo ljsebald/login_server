@@ -1260,6 +1260,8 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
     char **row;
 
     c->language_code = pkt->language_code;
+    c->ext_version = CLIENT_EXTVER_GC | CLIENT_EXTVER_GC_EP12;
+    c->ext_version |= (pkt->version << 8);
 
     /* Escape all the important strings. */
     sylverant_db_escape_str(&conn, xbluid, pkt->xbl_userid, 16);
