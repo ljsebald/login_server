@@ -1283,7 +1283,10 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
         sylverant_db_result_free(result);
 
         c->guildcard = gc;
-        return send_dc_security(c, gc, NULL, 0);
+        send_dc_security(c, gc, NULL, 0);
+        send_motd(c);
+        c->motd_wait = 1;
+        return 0;
     }
 
     sylverant_db_result_free(result);
@@ -1717,14 +1720,16 @@ int process_dclogin_packet(login_client_t *c, void *pkt) {
         case SHIP_LIST_TYPE:
             /* XXXX: I don't have anything here either, but thought I'd be
                funny anyway. */
-            tmp = send_motd(c);
+            if(c->type != CLIENT_TYPE_XBOX) {
+                tmp = send_motd(c);
 
-            if(!tmp) {
-                c->motd_wait = 1;
-                return 0;
-            }
-            else if(tmp < 0) {
-                return tmp;
+                if(!tmp) {
+                    c->motd_wait = 1;
+                    return 0;
+                }
+                else if(tmp < 0) {
+                    return tmp;
+                }
             }
 
             /* Don't send the initial menu to the PC NTE, as there's no good
