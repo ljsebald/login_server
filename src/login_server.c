@@ -420,6 +420,8 @@ int ship_transfer(login_client_t *c, uint32_t shipid) {
         port = (uint16_t)strtoul(row[1], NULL, 0) + c->type;
     else if(c->type == CLIENT_TYPE_DCNTE)
         port = (uint16_t)strtoul(row[1], NULL, 0);
+    else if(c->type == CLIENT_TYPE_XBOX)
+        port = (uint16_t)strtoul(row[1], NULL, 0) + 5;
     else
         port = (uint16_t)strtoul(row[1], NULL, 0) + 4;
 
