@@ -1340,8 +1340,8 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
 
         c->guildcard = gc;
         send_dc_security(c, gc, pkt->sec_data, 64);
-        send_motd(c);
-        c->motd_wait = 1;
+        //send_motd(c);
+        //c->motd_wait = 1;
         return 0;
     }
 
@@ -1783,7 +1783,7 @@ int process_dclogin_packet(login_client_t *c, void *pkt) {
         case SHIP_LIST_TYPE:
             /* XXXX: I don't have anything here either, but thought I'd be
                funny anyway. */
-            if(c->type != CLIENT_TYPE_XBOX) {
+            //if(c->type != CLIENT_TYPE_XBOX) {
                 tmp = send_motd(c);
 
                 if(!tmp) {
@@ -1793,7 +1793,7 @@ int process_dclogin_packet(login_client_t *c, void *pkt) {
                 else if(tmp < 0) {
                     return tmp;
                 }
-            }
+            //}
 
             /* Don't send the initial menu to the PC NTE, as there's no good
                reason to send it quest files that it can't do anything useful
