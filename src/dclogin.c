@@ -229,6 +229,43 @@ static int is_gc_online(uint32_t gc) {
     return rv;
 }
 
+static int keycheck(char serial[8], char access[8]) {
+    uint64_t ak;
+    int i;
+
+    if(!serial[0] || !serial[1] || !serial[2] || !serial[3] ||
+       !serial[4] || !serial[5] || !serial[6] || !serial[7])
+        return -1;
+
+    if(!access[0] || !access[1] || !access[2] || !access[3] ||
+       !access[4] || !access[5] || !access[6] || !access[7])
+        return -1;
+
+    ak = (((uint64_t)access[0]) <<  0) | (((uint64_t)access[1]) <<  8) |
+         (((uint64_t)access[2]) << 16) | (((uint64_t)access[3]) << 24) |
+         (((uint64_t)access[4]) << 32) | (((uint64_t)access[5]) << 40) |
+         (((uint64_t)access[6]) << 48) | (((uint64_t)access[7]) << 56);
+
+    for(i = 0; i < 8; ++i) {
+        if(!isdigit(serial[i]) && serial[i] < 'A' || serial[i] > 'F')
+            return -1;
+
+        if(!isalnum(access[i]))
+            return -1;
+    }
+
+    if(ak == 0300601403006014030060LLU || ak == 0304611423046114230461LLU ||
+       ak == 0310621443106214431062LLU || ak == 0314631463146314631463LLU ||
+       ak == 0320641503206415032064LLU || ak == 0324651523246515232465LLU ||
+       ak == 0330661543306615433066LLU || ak == 0334671563346715633467LLU ||
+       ak == 0340701603407016034070LLU || ak == 0344711623447116234471LLU ||
+       ak == 0340671543246414631061LLU || ak == 0304621463206515433470LLU ||
+       ak == 0310631503246615634071LLU)
+        return -1;
+
+    return 0;
+}
+
 /* Handle a client's login request packet. */
 static int handle_ntelogin(login_client_t *c, dcnte_login_88_pkt *pkt) {
     char query[256], serial[64], access[64];
@@ -499,6 +536,12 @@ static int handle_login0(login_client_t *c, dc_login_90_pkt *pkt) {
         return -1;
     }
 
+    if(keycheck(pkt->serial, pkt->access_key)) {
+        send_large_msg(c, __(c, "\tECannot connect to server.\n"
+                       "Please check your settings."));
+        return -1;
+    }
+
     /* Escape all the important strings. */
     sylverant_db_escape_str(&conn, serial, pkt->serial, 8);
     sylverant_db_escape_str(&conn, access, pkt->access_key, 8);
@@ -537,6 +580,12 @@ static int handle_login3(login_client_t *c, dc_login_93_pkt *pkt) {
     time_t banlen;
 
     c->language_code = pkt->language_code;
+
+    if(keycheck(pkt->serial, pkt->access_key)) {
+        send_large_msg(c, __(c, "\tECannot connect to server.\n"
+                       "Please check your settings."));
+        return -1;
+    }
 
     /* Escape all the important strings. */
     sylverant_db_escape_str(&conn, dc_id, pkt->dc_id, 8);
@@ -665,6 +714,12 @@ static int handle_logina(login_client_t *c, dcv2_login_9a_pkt *pkt) {
     }
     else if(banned) {
         send_ban_msg(c, banlen, query);
+        return -1;
+    }
+
+    if(c->type != CLIENT_TYPE_PC && keycheck(pkt->serial, pkt->access_key)) {
+        send_large_msg(c, __(c, "\tECannot connect to server.\n"
+                       "Please check your settings."));
         return -1;
     }
 
@@ -1301,6 +1356,13 @@ static int handle_logind(login_client_t *c, dcv2_login_9d_pkt *pkt) {
        now we actually use more here, so I guess I shouldn't complain too much
        about it anymore... */
     c->language_code = pkt->language_code;
+
+    if(c->type != CLIENT_TYPE_PC && pkt->version != 0x30 &&
+       keycheck(pkt->serial, pkt->access_key)) {
+           send_large_msg(c, __(c, "\tECannot connect to server.\n"
+                          "Please check your settings."));
+           return -1;
+    }
 
     /* The Gamecube Episode I & II trial looks like it's a Dreamcast client up
        until this point. */
