@@ -127,7 +127,7 @@ static int is_ip_banned(login_client_t *c, time_t *until, char *reason) {
     sprintf(query, "SELECT enddate, reason FROM ip_bans NATURAL JOIN bans "
             "WHERE addr = '%u' AND enddate >= UNIX_TIMESTAMP() "
             "AND startdate <= UNIX_TIMESTAMP()",
-            (unsigned int)addr->sin_addr.s_addr);
+            (unsigned int)ntohl(addr->sin_addr.s_addr));
 
     /* If we can't query the database, fail. */
     if(sylverant_db_query(&conn, query)) {
