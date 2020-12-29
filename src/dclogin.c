@@ -44,6 +44,7 @@ extern sylverant_quest_list_t qlist[CLIENT_TYPE_COUNT][CLIENT_LANG_COUNT];
 extern sylverant_limits_t *limits;
 extern volatile sig_atomic_t shutting_down;
 static uint32_t next_pcnte_gc = 500;
+const void *my_ntop(struct sockaddr_storage *addr, char str[INET6_ADDRSTRLEN]);
 
 void print_packet(unsigned char *pkt, int len) {
     unsigned char *pos = pkt, *row = pkt;
@@ -247,7 +248,7 @@ static int keycheck(char serial[8], char ak[8]) {
           (((uint64_t)ak[6]) << 48) | (((uint64_t)ak[7]) << 56);
 
     for(i = 0; i < 8; ++i) {
-        if(!isdigit(serial[i]) && serial[i] < 'A' || serial[i] > 'F')
+        if(!isdigit(serial[i]) && (serial[i] < 'A' || serial[i] > 'F'))
             return -1;
 
         if(!isalnum(ak[i]))
@@ -1155,21 +1156,12 @@ static int handle_xbhlcheck(login_client_t *c, xb_hlcheck_pkt *pkt) {
     void *result;
     char **row;
     time_t banlen;
-    int banned = is_ip_banned(c, &banlen, query);
+    int banned;
 
     c->ext_version = CLIENT_EXTVER_GC | CLIENT_EXTVER_GC_EP12;
 
     /* Save the raw version code in the extended version field too... */
     c->ext_version |= (pkt->version << 8);
-
-    /* Make sure the user isn't IP banned. */
-    if(banned == -1) {
-        return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_CONN_ERROR);
-    }
-    else if(banned) {
-        send_ban_msg(c, banlen, query);
-        return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_SUSPENDED);
-    }
 
     /* Escape all the important strings. */
     sylverant_db_escape_str(&conn, xbluid, (const char *)pkt->xbl_userid, 16);
@@ -1314,6 +1306,27 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
     char query[256], xbluid[32];
     void *result;
     char **row;
+    xbox_ip_t *ip = (xbox_ip_t *)pkt->sec_data;
+    time_t banlen;
+    int banned;
+    struct sockaddr_in *addr = (struct sockaddr_in *)&c->ip_addr;
+    char ipstr[INET6_ADDRSTRLEN];
+
+    /* Check if the user is IP banned. */
+    memset(&c->ip_addr, 0, sizeof(struct sockaddr_storage));
+    addr->sin_family = AF_INET;
+    addr->sin_addr.s_addr = ip->wan_ip;
+    addr->sin_port = ip->port;
+
+    banned = is_ip_banned(c, &banlen, query);
+
+    if(banned == -1) {
+        return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_CONN_ERROR);
+    }
+    else if(banned) {
+        send_ban_msg(c, banlen, query);
+        return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_SUSPENDED);
+    }
 
     c->language_code = pkt->language_code;
     c->ext_version = CLIENT_EXTVER_GC | CLIENT_EXTVER_GC_EP12;
@@ -1338,10 +1351,34 @@ static int handle_xblogine(login_client_t *c, xb_login_9e_pkt *pkt) {
         gc = (uint32_t)strtoul(row[0], NULL, 0);
         sylverant_db_result_free(result);
 
+        my_ntop(&c->ip_addr, ipstr);
+        debug(DBG_LOG, "Xbox Guildcard %" PRIu32 " connected from real IP %s\n",
+              gc, ipstr);
+
+        /* Make sure the guildcard isn't banned. */
+        banned = is_gc_banned(gc, &banlen, query);
+
+        if(banned == -1) {
+            return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_CONN_ERROR);
+        }
+        else if(banned) {
+            send_ban_msg(c, banlen, query);
+            return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_SUSPENDED);
+        }
+
+        /* Make sure the guildcard isn't online already. */
+        banned = is_gc_online(gc);
+
+        if(banned == -1) {
+            return send_simple(c, LOGIN_9A_TYPE, LOGIN_DB_CONN_ERROR);
+        }
+        else if(banned) {
+            send_large_msg(c, __(c, "\tEYour guildcard is already online."));
+            return -1;
+        }
+
         c->guildcard = gc;
         send_dc_security(c, gc, NULL, 0);
-        //send_motd(c);
-        //c->motd_wait = 1;
         return 0;
     }
 
@@ -1783,17 +1820,15 @@ int process_dclogin_packet(login_client_t *c, void *pkt) {
         case SHIP_LIST_TYPE:
             /* XXXX: I don't have anything here either, but thought I'd be
                funny anyway. */
-            //if(c->type != CLIENT_TYPE_XBOX) {
-                tmp = send_motd(c);
+            tmp = send_motd(c);
 
-                if(!tmp) {
-                    c->motd_wait = 1;
-                    return 0;
-                }
-                else if(tmp < 0) {
-                    return tmp;
-                }
-            //}
+            if(!tmp) {
+                c->motd_wait = 1;
+                return 0;
+            }
+            else if(tmp < 0) {
+                return tmp;
+            }
 
             /* Don't send the initial menu to the PC NTE, as there's no good
                reason to send it quest files that it can't do anything useful
